@@ -1,0 +1,11 @@
+Flask==3.1.1
+pybreaker==0.7.0
+grpcio==1.71.0
+grpcio-tools==1.71.0
+prometheus-client==0.20.0
+prometheus_flask_exporter==0.22.3
+python-jose[cryptography]==3.3.0
+requests==2.31.0
+
+PyJWT==2.6.0
+

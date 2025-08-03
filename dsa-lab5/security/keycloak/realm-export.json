@@ -1,0 +1,41 @@
+{
+  "realm": "dsa-lab",
+  "enabled": true,
+  "displayName": "DSA Lab Realm",
+  "users": [
+    {
+      "username": "alice@example.com",
+      "enabled": true,
+      "firstName": "Alice",
+      "lastName": "Smith",
+      "email": "alice@example.com",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "secret",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["ROLE_USER"]
+    }
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "ROLE_USER",
+        "description": "User role"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "rest-client",
+      "enabled": true,
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
+      "redirectUris": ["*"],
+      "webOrigins": ["*"]
+    }
+  ]
+}

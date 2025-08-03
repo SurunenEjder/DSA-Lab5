@@ -1,0 +1,7 @@
+grpcio==1.71.0
+grpcio-tools==1.71.0
+pymongo==4.3.3
+grpcio-reflection
+grpcio-health-checking==1.71.0
+prometheus-client==0.20.0
+# grpcio_prometheus==1.38.0

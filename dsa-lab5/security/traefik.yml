@@ -1,0 +1,14 @@
+# Static configuration
+entryPoints:
+  websecure:
+    address: ":443"
+
+# Explicit self-signed certificate bundle
+tls:
+  certificates:
+    - certFile: "/certs/rest-service.crt"
+      keyFile: "/certs/rest-service.key"
+
+providers:
+  docker:
+    exposedByDefault: false  # enforce "opt-in with "labels

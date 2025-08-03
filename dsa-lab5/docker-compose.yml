@@ -1,0 +1,133 @@
+#version: '3.8'
+
+  
+
+
+services:
+  mymongo:
+    image: mongo:latest
+    container_name: mymongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  grpc-service:
+    build:
+      context: grpc
+      dockerfile: Dockerfile
+    container_name: grpc-service
+    depends_on:
+      mymongo:
+        condition: service_healthy
+    environment:
+      MONGO_HOST: mymongo
+      MONGO_PORT: 27017
+      MONGO_DB: itemsdb
+      MONGO_USER: root
+      MONGO_PASSWORD: example
+    ports:
+      - "50051:50051"
+      - "9103:9103"  # Prometheus metrics port
+    healthcheck:
+      # Use a simpler health check that doesn't require gRPC connection
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.settimeout(1); result=s.connect_ex(('localhost',50051)); s.close(); exit(0 if result==0 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - ./ca.crt:/DSA-LAB5/grpc/ca.crt:ro
+      - ./grpc-service.key:/DSA-LAB5/grpc/grpc-service.key:ro
+      - ./grpc-service.crt:/DSA-LAB5/grpc/grpc-service.crt:ro
+
+  rest-service:
+    build:
+      context: rest
+      dockerfile: Dockerfile
+    container_name: rest-service
+    depends_on:
+      grpc-service:
+        condition: service_healthy
+    environment:
+      GRPC_HOST: grpc-service
+      GRPC_PORT: 50051
+    ports:
+      - "5000:5000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.rest-service.rule=PathPrefix(`/api`)"
+      - "traefik.http.routers.rest-service.tls=true"
+      - "traefik.http.services.rest-service.loadbalancer.server.port=5000"
+      - "traefik.http.middlewares.rest-strip.stripprefix.prefixes=/api"
+      - "traefik.http.routers.rest-service.middlewares=rest-strip"
+    volumes:
+      - ./ca.crt:/DSA-LAB5/rest/ca.crt:ro
+      - ./rest-service.key:/DSA-LAB5/rest/rest-service.key:ro
+      - ./rest-service.crt:/DSA-LAB5/rest/rest-service.crt:ro
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+    
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: grafana
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_USER: admin
+    volumes:
+      - ./observability/grafana-provisioning:/etc/grafana/provisioning:ro
+
+
+  gateway:
+    image: traefik:v2.11
+    restart: always
+    command:
+      - "--entryPoints.websecure.address=:443"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedByDefault=false"
+      - "--providers.file.filename=/etc/traefik/traefik.yml"
+    ports:
+      - "443:443"
+      - "8081:8080"  # Changed from 8080 to 8081
+    volumes:
+      - ./security/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./security/certs:/certs:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.2.5
+    command: start-dev --import-realm
+    environment:
+      KC_DB: dev-mem
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    volumes:
+      - ./security/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    ports:
+      - "8080:8080"
